@@ -1,4 +1,27 @@
 #! /bin/sh
+####################################################################################################
+##
+## File name : analy_web_ssl_access_info_adv.sh
+## Description : Analyzing request count/response packet size using WEB SSL Access log.
+## information : The file format for date extraction and the packet format for packet size extraction
+##               are adjusted according to the form of the analysis file.. 
+## 
+##=======================================================================================
+##  version   date             author      reason
+##---------------------------------------------------------------------------------------
+##  1.0    2020.07.29     k.s.k     First Created
+##
+####################################################################################################
+# ======<<<< Signal common processing logic (Start) >>>>==============================================
+trap ' echo "$(date +${logdatefmt}) $0 signal(SIGINT ) captured" | tee -a ${logfnm}; exit 1;' SIGINT
+trap ' echo "$(date +${logdatefmt}) $0 signal(SIGQUIT) captured" | tee -a ${logfnm}; exit 1;' SIGQUIT
+trap ' echo "$(date +${logdatefmt}) $0 signal(SIGTERM) captured" | tee -a ${logfnm}; exit 1;' SIGTERM 
+# ======<<<< Signal common processing logic (End) >>>>================================================
+
+# ======<<<< Important Global Variable Registration Area Marking Comment (Start) >>>>=================
+# Log file name variable for storing script execution information:used in Signal common processing logic
+#logfnm="execute information log full path name : ex) /applog/infra/os/osstdchk.sh.log"
+logdatefmt="%Y%m%d-%H:%M:%S"   # date/time format variable for logging info :used in Signal common logic
 
 # total request count of all files
 declare -A total_count
@@ -16,8 +39,15 @@ declare -A onefile_response_packet_size
 # temporary variable
 declare -A tmp_onefile_count
 declare -A tmp_response_packet_size
-
-#get string in unit size format 
+# ======<<<< Important Global Variable Registration Area Marking Comment (End) >>>>===================
+# ======<<<< Function Registration Area Marking Comment (Start) >>>>==================================
+######################################################################################################
+##  Function Name : get_unit_size_info
+##  Description : Get string in unit size format.
+##                And returns the converted string.
+##  information : input packet size values by unit(GB, MB, KB, B)
+##                output string format is ‘ 1 GB 1 MB 1 KB 2 Bytes’
+######################################################################################################
 get_unit_size_info()
 {
   str_packet_size=""
@@ -40,7 +70,12 @@ get_unit_size_info()
   eval "$5=\"${str_packet_size}\""
 }
 
-# cumulate data
+######################################################################################################
+##  Function Name : cumulate_data
+##  Description : Cumulative calculation and output of extraction data.
+##  information : input packet size value by unit(B), request counts
+##                output none
+######################################################################################################
 cumulate_data()
 {
   # assign argument values to local variables
@@ -92,7 +127,12 @@ cumulate_data()
   echo "req_date : $1 , response_packet_size : $2 Bytes [${str_response_packet_size}] >> total_response_packet_size : [ ${str_total_response_packet_size} ] , sizeable_packet_request_count : [ ${total_count[sizeable_req]} ], all_packet_request_count : [ ${total_count[all_req]} ] "
 }
 
-# analize packet size by one file
+######################################################################################################
+##  Function Name : analy_summary_packet
+##  Description : Extract the packet size and number of requests from one file.
+##  information : input filename
+##                output none
+######################################################################################################
 analy_summary_packet()
 {
   echo "filename : $1 "
@@ -118,9 +158,26 @@ analy_summary_packet()
   cumulate_data $var_dt ${onefile_response_packet_size[B]} ${onefile_count[all_req]} ${onefile_count[sizeable_req]}
 }
 
-# main - search file in current directory
-#for ix in $(ls `pwd`/ssl_access.log.*)
-for ix in $(ls ssl_access.log.*)
+######################################################################################################
+##  Function Name : is_analysis_file
+##  Description : To check if the file is a plintext file.
+##  information : input filename
+##                output -1 : zipfile,  1 : plaintext
+######################################################################################################
+is_analysis_file()
+{
+  # gzip file skip
+  gzip -t $1 > /dev/null 2>&1
+  if [ $? -eq 0 ];
+  then
+    echo "........ $1 is not plaintext file. (gzip file) - skip ......"
+    return -1
+  fi    
+  return 1
+}
+# ======<<<< Function Registration Area Marking Comment (End) >>>>===================================
+# ======<<<< Main Logic Coding Area Marking Comment (Start) >>>=======================================
+for ix in $(ls `pwd`/ssl_access.log.*)
 do
   #file only
   if [ -f $ix ]
@@ -136,3 +193,4 @@ do
     fi
   fi
 done
+# ======<<<< Main Logic Coding Area Marking Comment (End) >>>=========================================
